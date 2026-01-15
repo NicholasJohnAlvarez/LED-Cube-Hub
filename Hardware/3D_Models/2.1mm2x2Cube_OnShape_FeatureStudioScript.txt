@@ -1,0 +1,334 @@
+FeatureScript 2411;
+import(path : "onshape/std/common.fs", version : "2411.0");
+
+/**
+ * LED Cube Base 2" with oval connector cutout
+ * 4-pin connector with print-compensated tolerances
+ * Width tolerance: +0.7mm (measured 0.4mm short with 0.3mm tolerance)
+ * Height tolerance: +0.1mm (measured good at 5.1mm)
+ */
+annotation { "Feature Type Name" : "LED Cube Base 2in", "Feature Type Description" : "Creates 2 inch LED cube base with oval connector pocket" }
+export const ledCubeBase2in = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Cube Size" }
+        isLength(definition.cubeSize, { (millimeter) : [40, 50.8, 100] } as LengthBoundSpec);
+        
+        annotation { "Name" : "Wall Thickness" }
+        isLength(definition.wallThickness, { (millimeter) : [1.0, 2.1, 5.0] } as LengthBoundSpec);
+        
+        annotation { "Name" : "Base Height" }
+        isLength(definition.baseHeight, { (millimeter) : [40, 48.7, 100] } as LengthBoundSpec);
+        
+        annotation { "Name" : "Edge Offset" }
+        isLength(definition.edgeOffset, { (millimeter) : [8, 12.0, 25] } as LengthBoundSpec);
+    }
+    {
+        var cs = definition.cubeSize;
+        var wt = definition.wallThickness;
+        var bh = definition.baseHeight;
+        var eo = definition.edgeOffset;
+        
+        // 4-PIN CONNECTOR POCKET DIMENSIONS
+        // Connector actual: 19.9mm x 5mm (inner), 21.9mm x 7mm (outer)
+        // Width tolerance: +0.7mm (to print at correct size)
+        // Height tolerance: +0.1mm (prints fine)
+        
+        // Step 1 (face/inner): 19.9mm + 0.7mm = 20.6mm width, 5mm + 0.1mm = 5.1mm height
+        var s1L = 20.6 * millimeter;  // Face length (19.9 + 0.7)
+        var s1W = 5.1 * millimeter;   // Face height (5.0 + 0.1)
+        var s1D = 1.1 * millimeter;   // Face depth
+        
+        // Step 2 (body/outer): 21.9mm + 0.7mm = 22.6mm width, 7mm + 0.1mm = 7.1mm height
+        var s2L = 22.6 * millimeter;  // Body length (21.9 + 0.7)
+        var s2W = 7.1 * millimeter;   // Body height (7.0 + 0.1)
+        var s2D = 1.0 * millimeter;   // Body depth
+        
+        var cx = cs / 2;
+        var cz = bh - eo;
+        
+        // Create outer box
+        fCuboid(context, id + "box", {
+            "corner1" : vector(0, 0, 0) * millimeter,
+            "corner2" : vector(cs, cs, bh)
+        });
+        
+        // Hollow it out
+        fCuboid(context, id + "inner", {
+            "corner1" : vector(wt, wt, wt),
+            "corner2" : vector(cs - wt, cs - wt, bh + 1 * millimeter)
+        });
+        
+        opBoolean(context, id + "hollow", {
+            "tools" : qCreatedBy(id + "inner", EntityType.BODY),
+            "targets" : qCreatedBy(id + "box", EntityType.BODY),
+            "operationType" : BooleanOperationType.SUBTRACTION
+        });
+        
+        // Connector pocket Step 1 (oval on front face)
+        var frontPlane = plane(vector(0, 0, 0) * millimeter, vector(0, -1, 0), vector(1, 0, 0));
+        var sketch1 = newSketchOnPlane(context, id + "sketch1", { "sketchPlane" : frontPlane });
+        
+        var r1 = s1W / 2;
+        var halfStraight1 = (s1L - s1W) / 2;
+        
+        skArc(sketch1, "arc1L", {
+            "start" : vector(cx - halfStraight1, cz + r1),
+            "mid" : vector(cx - halfStraight1 - r1, cz),
+            "end" : vector(cx - halfStraight1, cz - r1)
+        });
+        
+        skArc(sketch1, "arc1R", {
+            "start" : vector(cx + halfStraight1, cz - r1),
+            "mid" : vector(cx + halfStraight1 + r1, cz),
+            "end" : vector(cx + halfStraight1, cz + r1)
+        });
+        
+        skLineSegment(sketch1, "line1T", {
+            "start" : vector(cx - halfStraight1, cz + r1),
+            "end" : vector(cx + halfStraight1, cz + r1)
+        });
+        
+        skLineSegment(sketch1, "line1B", {
+            "start" : vector(cx + halfStraight1, cz - r1),
+            "end" : vector(cx - halfStraight1, cz - r1)
+        });
+        
+        skSolve(sketch1);
+        
+        opExtrude(context, id + "ext1", {
+            "entities" : qSketchRegion(id + "sketch1"),
+            "direction" : vector(0, 1, 0),
+            "endBound" : BoundingType.BLIND,
+            "endDepth" : s1D
+        });
+        
+        opBoolean(context, id + "bool1", {
+            "tools" : qCreatedBy(id + "ext1", EntityType.BODY),
+            "targets" : qCreatedBy(id + "box", EntityType.BODY),
+            "operationType" : BooleanOperationType.SUBTRACTION
+        });
+        
+        // Connector pocket Step 2 (larger oval)
+        var innerPlane = plane(vector(0 * millimeter, s1D, 0 * millimeter), vector(0, -1, 0), vector(1, 0, 0));
+        var sketch2 = newSketchOnPlane(context, id + "sketch2", { "sketchPlane" : innerPlane });
+        
+        var r2 = s2W / 2;
+        var halfStraight2 = (s2L - s2W) / 2;
+        
+        skArc(sketch2, "arc2L", {
+            "start" : vector(cx - halfStraight2, cz + r2),
+            "mid" : vector(cx - halfStraight2 - r2, cz),
+            "end" : vector(cx - halfStraight2, cz - r2)
+        });
+        
+        skArc(sketch2, "arc2R", {
+            "start" : vector(cx + halfStraight2, cz - r2),
+            "mid" : vector(cx + halfStraight2 + r2, cz),
+            "end" : vector(cx + halfStraight2, cz + r2)
+        });
+        
+        skLineSegment(sketch2, "line2T", {
+            "start" : vector(cx - halfStraight2, cz + r2),
+            "end" : vector(cx + halfStraight2, cz + r2)
+        });
+        
+        skLineSegment(sketch2, "line2B", {
+            "start" : vector(cx + halfStraight2, cz - r2),
+            "end" : vector(cx - halfStraight2, cz - r2)
+        });
+        
+        skSolve(sketch2);
+        
+        opExtrude(context, id + "ext2", {
+            "entities" : qSketchRegion(id + "sketch2"),
+            "direction" : vector(0, 1, 0),
+            "endBound" : BoundingType.BLIND,
+            "endDepth" : s2D
+        });
+        
+        opBoolean(context, id + "bool2", {
+            "tools" : qCreatedBy(id + "ext2", EntityType.BODY),
+            "targets" : qCreatedBy(id + "box", EntityType.BODY),
+            "operationType" : BooleanOperationType.SUBTRACTION
+        });
+    });
+
+
+/**
+ * LED Cube Lid 2" with oval connector cutout
+ * 4-pin connector with print-compensated tolerances
+ */
+annotation { "Feature Type Name" : "LED Cube Lid 2in", "Feature Type Description" : "Creates 2 inch LED cube lid with oval connector pocket" }
+export const ledCubeLid2in = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Cube Size" }
+        isLength(definition.cubeSize, { (millimeter) : [40, 50.8, 100] } as LengthBoundSpec);
+        
+        annotation { "Name" : "Lid Thickness" }
+        isLength(definition.lidThickness, { (millimeter) : [1.0, 2.1, 10.0] } as LengthBoundSpec);
+        
+        annotation { "Name" : "Edge Offset" }
+        isLength(definition.edgeOffset, { (millimeter) : [8, 12.0, 25] } as LengthBoundSpec);
+        
+        annotation { "Name" : "X Offset" }
+        isLength(definition.xOffset, { (millimeter) : [0, 60, 200] } as LengthBoundSpec);
+        
+        annotation { "Name" : "Add Lip" }
+        definition.addLip is boolean;
+        
+        if (definition.addLip)
+        {
+            annotation { "Name" : "Lip Height" }
+            isLength(definition.lipHeight, { (millimeter) : [2, 4.0, 8] } as LengthBoundSpec);
+        }
+    }
+    {
+        var cs = definition.cubeSize;
+        var lt = definition.lidThickness;
+        var eo = definition.edgeOffset;
+        var xo = definition.xOffset;
+        
+        // 4-PIN CONNECTOR POCKET DIMENSIONS (print-compensated)
+        // Width tolerance: +0.7mm, Height tolerance: +0.1mm
+        var s1L = 20.6 * millimeter;  // Face length (19.9 + 0.7)
+        var s1W = 5.1 * millimeter;   // Face height (5.0 + 0.1)
+        var s1D = 1.1 * millimeter;   // Face depth
+        var s2L = 22.6 * millimeter;  // Body length (21.9 + 0.7)
+        var s2W = 7.1 * millimeter;   // Body height (7.0 + 0.1)
+        var s2D = 1.0 * millimeter;   // Body depth
+        
+        var cx = cs / 2 + xo;
+        var cy = eo;
+        
+        // Create lid plate
+        fCuboid(context, id + "plate", {
+            "corner1" : vector(xo, 0 * millimeter, 0 * millimeter),
+            "corner2" : vector(cs + xo, cs, lt)
+        });
+        
+        // Step 1 oval on top
+        var topPlane = plane(vector(0 * millimeter, 0 * millimeter, lt), vector(0, 0, 1), vector(1, 0, 0));
+        var sketch1 = newSketchOnPlane(context, id + "sketch1", { "sketchPlane" : topPlane });
+        
+        var r1 = s1W / 2;
+        var halfStraight1 = (s1L - s1W) / 2;
+        
+        skArc(sketch1, "arc1L", {
+            "start" : vector(cx - halfStraight1, cy + r1),
+            "mid" : vector(cx - halfStraight1 - r1, cy),
+            "end" : vector(cx - halfStraight1, cy - r1)
+        });
+        
+        skArc(sketch1, "arc1R", {
+            "start" : vector(cx + halfStraight1, cy - r1),
+            "mid" : vector(cx + halfStraight1 + r1, cy),
+            "end" : vector(cx + halfStraight1, cy + r1)
+        });
+        
+        skLineSegment(sketch1, "line1T", {
+            "start" : vector(cx - halfStraight1, cy + r1),
+            "end" : vector(cx + halfStraight1, cy + r1)
+        });
+        
+        skLineSegment(sketch1, "line1B", {
+            "start" : vector(cx + halfStraight1, cy - r1),
+            "end" : vector(cx - halfStraight1, cy - r1)
+        });
+        
+        skSolve(sketch1);
+        
+        opExtrude(context, id + "ext1", {
+            "entities" : qSketchRegion(id + "sketch1"),
+            "direction" : vector(0, 0, -1),
+            "endBound" : BoundingType.BLIND,
+            "endDepth" : s1D
+        });
+        
+        opBoolean(context, id + "bool1", {
+            "tools" : qCreatedBy(id + "ext1", EntityType.BODY),
+            "targets" : qCreatedBy(id + "plate", EntityType.BODY),
+            "operationType" : BooleanOperationType.SUBTRACTION
+        });
+        
+        // Step 2 oval (larger)
+        var midPlane = plane(vector(0 * millimeter, 0 * millimeter, lt - s1D), vector(0, 0, 1), vector(1, 0, 0));
+        var sketch2 = newSketchOnPlane(context, id + "sketch2", { "sketchPlane" : midPlane });
+        
+        var r2 = s2W / 2;
+        var halfStraight2 = (s2L - s2W) / 2;
+        
+        skArc(sketch2, "arc2L", {
+            "start" : vector(cx - halfStraight2, cy + r2),
+            "mid" : vector(cx - halfStraight2 - r2, cy),
+            "end" : vector(cx - halfStraight2, cy - r2)
+        });
+        
+        skArc(sketch2, "arc2R", {
+            "start" : vector(cx + halfStraight2, cy - r2),
+            "mid" : vector(cx + halfStraight2 + r2, cy),
+            "end" : vector(cx + halfStraight2, cy + r2)
+        });
+        
+        skLineSegment(sketch2, "line2T", {
+            "start" : vector(cx - halfStraight2, cy + r2),
+            "end" : vector(cx + halfStraight2, cy + r2)
+        });
+        
+        skLineSegment(sketch2, "line2B", {
+            "start" : vector(cx + halfStraight2, cy - r2),
+            "end" : vector(cx - halfStraight2, cy - r2)
+        });
+        
+        skSolve(sketch2);
+        
+        opExtrude(context, id + "ext2", {
+            "entities" : qSketchRegion(id + "sketch2"),
+            "direction" : vector(0, 0, -1),
+            "endBound" : BoundingType.BLIND,
+            "endDepth" : s2D
+        });
+        
+        opBoolean(context, id + "bool2", {
+            "tools" : qCreatedBy(id + "ext2", EntityType.BODY),
+            "targets" : qCreatedBy(id + "plate", EntityType.BODY),
+            "operationType" : BooleanOperationType.SUBTRACTION
+        });
+        
+        // Optional lip
+        if (definition.addLip)
+        {
+            var lh = definition.lipHeight;
+            var lw = 1.8 * millimeter;
+            var lg = 0.3 * millimeter;
+            
+            var botPlane = plane(vector(0 * millimeter, 0 * millimeter, 0 * millimeter), vector(0, 0, -1), vector(1, 0, 0));
+            var sketchLip = newSketchOnPlane(context, id + "sketchLip", { "sketchPlane" : botPlane });
+            
+            skRectangle(sketchLip, "outer", {
+                "firstCorner" : vector(xo + lw + lg, lw + lg),
+                "secondCorner" : vector(cs + xo - lw - lg, cs - lw - lg)
+            });
+            
+            skRectangle(sketchLip, "inner", {
+                "firstCorner" : vector(xo + lw + lw + lg, lw + lw + lg),
+                "secondCorner" : vector(cs + xo - lw - lw - lg, cs - lw - lw - lg)
+            });
+            
+            skSolve(sketchLip);
+            
+            opExtrude(context, id + "extLip", {
+                "entities" : qSketchRegion(id + "sketchLip"),
+                "direction" : vector(0, 0, -1),
+                "endBound" : BoundingType.BLIND,
+                "endDepth" : lh - 0.5 * millimeter
+            });
+            
+            opBoolean(context, id + "unionLip", {
+                "tools" : qCreatedBy(id + "extLip", EntityType.BODY),
+                "targets" : qCreatedBy(id + "plate", EntityType.BODY),
+                "operationType" : BooleanOperationType.UNION
+            });
+        }
+    });
