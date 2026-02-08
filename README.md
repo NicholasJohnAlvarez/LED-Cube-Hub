@@ -1,261 +1,220 @@
-# LED Cube Hub
+# LED Cube Hub Firmware v2.3
 
-ESP32-C3 based modular LED cube system with hot-swappable magnetic connectors and intelligent cube detection.
+ESP32-C3 based modular LED cube system with hot-swappable magnetic cubes and intelligent DS2431-based detection.
 
-![Firmware Version](https://img.shields.io/badge/firmware-v2.1-blue)
-![Platform](https://img.shields.io/badge/platform-PlatformIO-orange)
-![Board](https://img.shields.io/badge/board-ESP32--C3-green)
+## Features
 
-## Overview
-
-The LED Cube Hub is a modular lighting system that allows you to build custom LED cube configurations by magnetically connecting individual cube modules. Each cube contains WS2812B addressable LEDs and a DS2431 1-Wire EEPROM chip that stores configuration data, enabling automatic detection and configuration when cubes are connected or removed.
-
-### Key Features
-
-- 🧲 **Hot-Swappable Cubes** - Magnetic connectors allow instant plug-and-play cube configuration
-- 🔍 **Automatic Detection** - DS2431 1-Wire EEPROM in each cube for auto-identification
-- 🎨 **Dynamic LED Control** - WS2812B addressable LEDs with multiple animation modes
-- 📱 **Gesture Control** - LIS3DH accelerometer for tap detection and orientation sensing
-- 💤 **Smart Sleep Mode** - Double-flip gesture to enter deep sleep, double-tap to wake
-- ⚡ **Low Power** - Deep sleep mode for battery operation (~0.043mA)
-- 🔧 **Serial Interface** - Full command-line control for debugging and configuration
+- 🧲 **Hot-swappable cubes** with magnetic pogo pin connectors
+- 🔄 **Truly modular** - program cubes once, use on any branch
+- 🎨 **WS2812B LED control** with multiple animations
+- 📱 **Gesture controls** via LIS3DH accelerometer
+- 💤 **Deep sleep mode** for battery operation
+- 🔋 **Factory-calibrated battery monitoring**
+- 🔧 **Serial command interface** for programming and control
 
 ## Hardware
 
-### 3D Models & Assembly
-**[View Complete Assembly on OnShape →](https://cad.onshape.com/documents/34c5c7f2d0c6fb02d6313538/w/ba31acd58973aaa831a2c1d2/e/0c686cc24784cde7dad5088e)**
+- **MCU:** Seeed XIAO ESP32-C3 (RISC-V, 160MHz)
+- **Accelerometer:** LIS3DH (I2C, tap/orientation detection)
+- **Cube Memory:** DS2431 1-Wire EEPROM (unique 64-bit ROM ID per cube)
+- **LEDs:** WS2812B addressable RGB (up to 300 total)
+- **Battery:** LiPo with voltage divider monitoring
 
-### Hub PCB Components
-- **Microcontroller:** Seeed XIAO ESP32-C3 (RISC-V, 160MHz, 400KB SRAM)
-- **Accelerometer:** LIS3DH 3-axis (I2C, interrupt-driven)
-- **LEDs:** WS2812B addressable RGB LEDs (up to 300 total)
-- **1-Wire Bus:** DS2431 EEPROM communication (GPIO21, 1.2k-4.7k pull-up)
-- **Magnetic Connectors:** Power and data for cube connections
-
-### Extension Cube PCB
-- **Memory:** DS2431 1024-bit EEPROM with unique 64-bit ROM ID
-- **LEDs:** WS2812B strips (configurable per cube)
-- **Connectors:** Magnetic interconnects for daisy-chaining
-
-### Pin Configuration
-```
-D3  (GPIO4)  - WS2812 LED Data
-D10 (GPIO21) - DS2431 1-Wire Bus
-D4  (GPIO6)  - LIS3DH I2C SDA
-D5  (GPIO7)  - LIS3DH I2C SCL
-D1  (GPIO2)  - LIS3DH INT1 (Wake-capable)
-```
-
-## Firmware Features
-
-### Animations
-- **Rainbow Wave** - Smooth HSV color cycling
-- **Breathe** - Pulsing brightness effect
-- **Chase** - Single LED runner with fade trail
-- **Sparkle** - Random white LED bursts
-- **Solid White** - Full brightness white
-- **Accelerometer Mode** - XYZ axes mapped to RGB color
-
-### Gestures & Controls
-- **Double-Tap** - Toggle LEDs on/off
-- **Double Flip** - Flip cube upside-down twice within 2 seconds to enter sleep mode
-- **Wake-Up Tap** - Double-tap while sleeping to wake device
-
-### Serial Commands
-```
-help      - Show all commands
-status    - System status and cube info
-scan      - Rescan 1-Wire bus for cubes
-list      - List all detected DS2431 devices
-next      - Cycle to next animation
-on/off    - Enable/disable LEDs
-accel     - Toggle accelerometer color mode
-xyz       - Print accelerometer data
-sleep     - Enter deep sleep immediately
-prog      - Program cube EEPROM
-read      - Read cube configuration
-```
-
-## Software Architecture
-
-The firmware is organized into three main files for clean separation of concerns:
+### Pin Configuration (v3 Hardware)
 
 ```
-src/
-├── main.cpp          - Setup, loop, serial command interface (356 lines)
-├── hardware.cpp      - Hardware implementations (634 lines)
-└── include/
-    └── hardware.h    - Declarations and configuration (135 lines)
+LED Data:
+  D3  (GPIO4)  - Branch 1 (on-board)
+  D6  (GPIO21) - Branch 2 (off-board)
+  D10 (GPIO10) - Branch 3 (off-board) - white-wired from D9 to avoid strapping pin
+
+1-Wire Bus:
+  D8  (GPIO8)  - Branch 1 (on-board)
+  D9  (GPIO9)  - Branch 2 (off-board) - white-wired from D10, strapping pin OK for 1-Wire
+  D2  (GPIO3)  - Branch 3 (off-board)
+
+LIS3DH:
+  D4  (GPIO6)  - I2C SDA
+  D5  (GPIO7)  - I2C SCL
+  D1  (GPIO3)  - INT1 (tap detection, wake-capable)
+
+Battery:
+  A0  - Battery voltage sense (2:1 divider, factory calibrated)
 ```
 
-### Architecture Benefits
-- ✅ **Modular Design** - Hardware abstraction separated from application logic
-- ✅ **Fast Compilation** - Only changed files recompile
-- ✅ **Reusable Code** - Hardware layer portable to other projects
-- ✅ **Easy Testing** - Individual modules can be tested independently
-- ✅ **Maintainable** - Clear separation makes debugging straightforward
+**Note:** v3 hardware swaps D9/D10 to avoid GPIO9 strapping pin issues with WS2812 timing.
 
-## Getting Started
-
-### Prerequisites
-- [PlatformIO IDE](https://platformio.org/install/ide?install=vscode) (VS Code extension)
-- USB-C cable for programming
-- Seeed XIAO ESP32-C3 board
+## Quick Start
 
 ### Installation
 
-1. **Clone the repository**
+1. Install [PlatformIO](https://platformio.org/install/ide?install=vscode)
+2. Clone repository
+3. Open in VS Code
+4. Upload to board (PlatformIO: Upload)
+5. Open Serial Monitor (115200 baud)
+
+### Programming Your First Cube
+
 ```bash
-git clone https://github.com/NicholasJohnAlvarez/LED-Cube-Hub.git
-cd LED-Cube-Hub
+# 1. Connect unprogrammed cube to any branch
+list              # See all 1-Wire devices
+
+# 2. Program it (branch, device index, type, LED count)
+prog 1 0 3 1     # Branch 1, device 0, Hub type, 1 LED
+prog 1 1 1 2     # Branch 1, device 1, Edge type, 2 LEDs
+
+# 3. Check status
+status           # Shows all detected cubes
+
+# 4. Move cube to another branch - it works automatically!
 ```
 
-2. **Open in VS Code**
-```bash
-code .
+### Cube Types
+
+| Type | Name   | Typical Use      |
+|------|--------|------------------|
+| 1    | Edge   | Edge cubes       |
+| 2    | Center | Center cubes     |
+| 3    | Hub    | Hub (on-board)   |
+
+## Commands
+
+```
+Essential:
+  help              - Show all commands
+  list              - List 1-Wire devices on each branch
+  prog <br> <idx> <type> <leds>  - Program cube
+  status            - System status and cube configuration
+  
+Control:
+  on/off            - Toggle LEDs
+  next              - Next animation
+  sleep             - Enter deep sleep
+  
+Debug:
+  scan              - Rescan all branches
+  bat               - Battery voltage
+  tap               - LIS3DH tap status
+  xyz               - Accelerometer data
 ```
 
-3. **Build and Upload**
-- Click the PlatformIO icon (alien head) in VS Code sidebar
-- Select "Upload and Monitor" under seeed_xiao_esp32c3
+## Gestures
 
-4. **Connect to Serial Monitor**
-- Baud rate: 115200
-- Type `help` to see available commands
+- **Single-tap** - Next animation
+- **Double-tap** - Toggle LEDs on/off
+- **Triple-flip** - Enter deep sleep (flip upside-down 3 times within 1.5s)
+- **Double-tap (sleeping)** - Wake from deep sleep
 
-### Configuration
+## Animations
 
-Edit `include/hardware.h` to customize:
+1. Rainbow Wave
+2. Breathe
+3. Chase
+4. Sparkle
+5. Solid White
+6. Accelerometer (XYZ → RGB)
+
+## Configuration
+
+Edit `include/hardware.h`:
+
 ```cpp
-#define MAX_CUBES       8      // Maximum number of cubes
-#define MAX_TOTAL_LEDS  300    // Total LED count
-#define ANIMATION_MS    33     // Animation frame rate (30fps)
+#define MAX_CUBES_PER_BRANCH  8
+#define MAX_TOTAL_LEDS        300
+#define ANIMATION_MS          33     // 30fps
+#define CLICK_THS             0x20   // Tap sensitivity (0x18-0x30 range)
 ```
 
-## Programming Cubes
+## Building
 
-Each cube must be programmed with its configuration before first use:
-
-```
-prog <index> <type> <led_count>
-
-Example:
-prog 0 1 25    // Program first cube as type 1 with 25 LEDs
-```
-
-**Cube Types:**
-- `1` - Corner cube
-- `2` - Edge cube  
-- `3` - Center cube
-- `4` - Hub cube
-
-## Power Consumption
-
-| Mode | Current Draw |
-|------|-------------|
-| Active (LEDs on) | ~60mA per LED @ full white |
-| Active (ESP32) | 40-80mA |
-| Deep Sleep | 0.043mA |
-| Serial Active | ~2mA |
-
-**Battery Life Example:**  
-With 100 LEDs @ 50% brightness and 1000mAh battery: ~3-4 hours continuous operation
-
-## Troubleshooting
-
-### LEDs not working
-- Check WS2812 data pin connection (D3/GPIO4)
-- Verify power supply can handle LED current
-- Ensure FastLED library version 3.6.0 is installed
-
-### Cubes not detected
-- Check 1-Wire pull-up resistor (1.2k-4.7k to VCC)
-- Verify DS2431 ROM ID is valid
-- Run `scan` command to force bus rescan
-
-### Double-tap not responding
-- Check INT1 connection (D1/GPIO2)
-- Verify I2C connections (SDA/SCL)
-- Run `tap` command to check CLICK_SRC register
-
-### Sleep/wake issues
-- Ensure LIS3DH INT1 is on GPIO2 (wake-capable pin)
-- Check that interrupt is configured as active-high
-- Test with `sleep` command first
-
-## Technical Details
-
-### FastLED Compatibility
-This project uses **FastLED 3.6.0** specifically for ESP32-C3 RISC-V compatibility. Newer versions (3.7+, 3.10+) have known issues with RMT interrupt handling on ESP32-C3 that cause boot loops.
-
-### 1-Wire Protocol
-- Uses standard Dallas/Maxim 1-Wire protocol
-- CRC-8 validation on all ROM ID reads
-- Page-based EEPROM writes (32 bytes per page)
-- Hot-swap detection via periodic bus scanning
-
-### Sleep Implementation
-- ESP32-C3 GPIO wake on D0-D3 pins only
-- Uses `esp_deep_sleep_enable_gpio_wakeup()` for compatibility
-- LIS3DH interrupt latching ensures wake signal persists
-- All state cleared on wake (cubes re-scanned)
-
-## Development
-
-### Building from Source
 ```bash
-# Install dependencies
-pio lib install
-
 # Clean build
 pio run -t clean
 
-# Build
-pio run
-
-# Upload
+# Build and upload
 pio run -t upload
 
-# Monitor serial
-pio device monitor
+# Monitor serial output
+pio device monitor -b 115200
 ```
 
-### Adding New Animations
-1. Add animation code in `hardware.cpp` under `runAnimation()`
-2. Increment animation count in `main.cpp` where `currentAnimation` cycles
-3. Rebuild and upload
+## Important Notes
 
-### Creating Custom Gestures
-1. Configure LIS3DH registers in `initLIS3DH()` 
-2. Add detection logic in `handleDoubleTap()` or `checkOrientation()`
-3. Implement action in main loop
+### FastLED Version
+**Must use FastLED 3.6.0** for ESP32-C3 compatibility. Newer versions have RMT interrupt issues.
 
-## Contributing
+### Battery Measurement
+Uses `analogReadMilliVolts()` with factory calibration and 16-sample averaging per Seeed Studio recommendations. Much more accurate than raw ADC reads.
 
-Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
+### Deep Sleep Wake
+- Only GPIO 0-5 can wake ESP32-C3 from deep sleep
+- LIS3DH INT1 on GPIO3 (D1) works perfectly
+- ~100ms delay before `esp_deep_sleep_start()` is critical
+- Do NOT use `Serial.flush()` before sleep on battery
+
+### Strapping Pins (v3 Hardware)
+- GPIO9 is a strapping pin - bad for WS2812 timing
+- GPIO9 is fine for 1-Wire (slow, tolerant protocol)
+- Solution: Swap D9↔D10 between LED and 1-Wire functions
+
+## Troubleshooting
+
+**LEDs not working**
+- Check FastLED version (must be 3.6.0)
+- Verify pin connections match hardware.h
+
+**Cubes not detected**
+- Run `list` to see 1-Wire devices
+- Check pull-up resistor on 1-Wire bus (2kΩ recommended)
+- Verify magnetic connector contact
+
+**Battery wake not working**
+- Ensure 100ms delay before `esp_deep_sleep_start()`
+- Remove `Serial.flush()` if present
+- Verify LIS3DH registers are configured (see `enterDeepSleep()`)
+
+**False sleep triggers when disconnecting cubes**
+- Increase flip threshold in `checkOrientation()`: `-13000` → `-14000` (current default is `-13000`)
+
+## Version History
+
+### v2.3 (Current)
+- Modular cube programming (program once, use anywhere)
+- Branch/index addressing for programming
+- Factory-calibrated battery measurement
+- v3 hardware support (GPIO9/10 swap)
+- Deep sleep wake fixes
+
+### v2.2
+- Gesture controls (tap, flip)
+- Low battery warnings
+- Sleep mode
+
+### v2.1
+- Initial release
+
+## Project Structure
+
+```
+LED-Cube-Hub/
+├── platformio.ini
+├── include/
+│   └── hardware.h        # Hardware declarations
+└── src/
+    ├── hardware.cpp      # Hardware implementation
+    └── main.cpp          # Main program & commands
+```
 
 ## License
 
-This project is open source. Feel free to use, modify, and distribute as needed.
+Open source - feel free to use and modify.
 
-## Acknowledgments
+## Author
 
-- **FastLED Library** - High-performance LED control
-- **Adafruit** - LIS3DH driver library
-- **OneWire Library** - DS2431 communication
-- **PlatformIO** - Modern embedded development platform
-
-## Project Status
-
-✅ Hardware design complete  
-✅ PCB designs finalized  
-✅ Firmware v2.1 stable  
-🔄 Custom PCB manufacturing planned  
-🔄 Battery management improvements  
-📋 Future: WiFi control and web interface
+Nicholas John Alvarez  
+[GitHub](https://github.com/NicholasJohnAlvarez)
 
 ---
 
-**Made with ❤️ by Nicholas John Alvarez**
-
-*For questions or collaboration: [GitHub Profile](https://github.com/NicholasJohnAlvarez)*
+**3D Models:** [OnShape CAD](https://cad.onshape.com/documents/34c5c7f2d0c6fb02d6313538/w/ba31acd58973aaa831a2c1d2/e/0c686cc24784cde7dad5088e)
